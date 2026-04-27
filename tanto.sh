@@ -111,6 +111,67 @@ ghpr() {
   _gh_open_url "$opener" "$search_url"
 }
 
+function mkcd() {
+    # Create a directory and enter it
+    mkdir -p "$1" && cd "$1"
+}
+
+function up() {
+    # Go up n directories
+    local d=""
+    limit=$1
+    for ((i=1 ; i <= limit ; i++))
+    do
+        d=$d/..
+    done
+    d=$(echo $d | sed 's/^\///')
+    if [ -z "$d" ]; then
+        d=..
+    fi
+    cd $d
+}
+
+function run_with_timing() {
+    start_time=$(date +%s.%N)
+    "$@"
+    end_time=$(date +%s.%N)
+    duration=$(echo "$end_time - $start_time" | bc)
+    echo "\nCommand completed in $duration seconds"
+}
+alias rwt=run_with_timing
+
+# Add to your shell configuration
+function proj() {
+    # Define your project directories
+    local projects=(
+        ~/src/github.com/stefaneg
+    )
+
+    # Use fzf to select project
+    local selected=$(find "${projects[@]}" -maxdepth 1 -type d | fzf)
+
+    if [[ -n "$selected" ]]; then
+        cd "$selected"
+        goland .
+    fi
+}
+
+function build-claude-sandbox(){
+  docker build -t claude-sandbox $TANTO_HOME/claude-sandbox
+}
+
+function claude-in-sandbox(){
+    echo "Running claude in sandbox with params $@"
+  	security find-generic-password -s "Claude Code-credentials" -w > "$HOME/.claude/.credentials.json"
+  	docker run --rm -it \
+  		-v "$(pwd)":/workspace \
+  		-v "$HOME/.claude":/home/claude/.claude \
+  		-v "$HOME/.claude.json":/home/claude/.claude.json \
+  		-e CURRENT_DIR_NAME="$(basename $(pwd))" \
+  		claude-sandbox $@
+}
+
+
 alias gr='ghrepo'
 alias ghr='ghrepo'
 alias gpr='ghpr'

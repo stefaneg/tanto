@@ -13,6 +13,7 @@ autoload -Uz compinit && compinit
 complete -C '/usr/local/bin/aws_completer' aws
 
 alias kubectl="minikube kubectl --"
+alias tf="terraform"
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -21,3 +22,16 @@ export NVM_DIR="$HOME/.nvm"
 . $TANTO_HOME/tanto.sh
 
 eval "$(starship init zsh)"
+
+export EDITOR=zed
+
+# Add to your .zshrc or .bashrc
+# This gives you better history searching
+export HISTSIZE=1000000
+export SAVEHIST=1000000
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_REDUCE_BLANKS
+
+# Create an alias for searching history
+alias hg='history | grep'
