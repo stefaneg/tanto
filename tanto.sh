@@ -162,12 +162,17 @@ function build-claude-sandbox(){
 
 function claude-in-sandbox(){
     echo "Running claude in sandbox with params $@"
+    local project_name project_path
+    project_name="$(basename "$(pwd)")"
+    project_path="/home/claude/projects/$project_name"
+    echo Project path: "$project_path"
   	security find-generic-password -s "Claude Code-credentials" -w > "$HOME/.claude/.credentials.json"
   	docker run --rm -it \
-  		-v "$(pwd)":/workspace \
+  		-v "$(pwd)":"$project_path" \
   		-v "$HOME/.claude":/home/claude/.claude \
   		-v "$HOME/.claude.json":/home/claude/.claude.json \
-  		-e CURRENT_DIR_NAME="$(basename $(pwd))" \
+  		-e CURRENT_DIR_NAME="$project_name" \
+  		-w "$project_path" \
   		claude-sandbox $@
 }
 

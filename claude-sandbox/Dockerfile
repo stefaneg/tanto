@@ -6,10 +6,19 @@ ARG GO_VERSION=1.23.4
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/usr/local/go/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:/home/claude/.local/bin:$PATH \
-    GOPATH=/home/claude/go \
-    GOCACHE=/home/claude/.cache/go-build \
-    NPM_CONFIG_PREFIX=/home/claude/.npm-global
+      PATH=/usr/local/go/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:/home/claude/.local/bin:$PATH \
+      GOPATH=/home/claude/go \
+      GOCACHE=/home/claude/.cache/go-build \
+      NPM_CONFIG_PREFIX=/home/claude/.npm-global \
+      BASH_ENV=/etc/bash.env
+
+
+RUN { \
+        echo 'export PATH=/usr/local/go/bin:/home/claude/go/bin:/home/claude/.npm-global/bin:/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'; \
+        echo 'export GOPATH=/home/claude/go'; \
+        echo 'export GOCACHE=/home/claude/.cache/go-build'; \
+      } > /etc/bash.env
+
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl wget git make gcc g++ pkg-config \
@@ -61,5 +70,5 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER claude
 RUN uv tool install nwave-ai
-WORKDIR /workspace
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
