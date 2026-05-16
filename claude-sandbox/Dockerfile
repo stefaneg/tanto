@@ -54,10 +54,6 @@ RUN useradd --create-home --shell /bin/bash claude
 RUN npm install -g @anthropic-ai/claude-code \
     && chown -R claude:claude /home/claude/.npm-global
 
-# nwave-ai
-# Install uv globally so it's available across build layers and users.
-RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-
 # Map host-style path so absolute paths in ~/.claude/settings.json hooks resolve.
 RUN mkdir -p /Users/gulli && ln -s /home/claude/.claude /Users/gulli/.claude
 
@@ -69,6 +65,5 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER claude
-RUN uv tool install nwave-ai
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
