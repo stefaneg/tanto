@@ -144,11 +144,42 @@ alias rwt=run_with_timing
 function proj() {
     # Define your project directories
     local projects=(
-        ~/src/github.com/stefaneg
+        ~/src/
     )
 
-    # Use fzf to select project
-    local selected=$(find "${projects[@]}" -maxdepth 1 -type d | fzf)
+    # Use fzf to select only git projects (.git can be a dir or file)
+    local selected=$(
+        find "${projects[@]}" -maxdepth 4 \( -name .git -type d -o -name .git -type f \) -print 2>/dev/null \
+            | sed 's#/\.git$##' \
+            | sort -u \
+            | fzf --preview '
+                dir={}
+                readme=""
+                for candidate in \
+                    "$dir/README.md" \
+                    "$dir/readme.md" \
+                    "$dir/README" \
+                    "$dir/readme" \
+                    "$dir/README.txt" \
+                    "$dir/readme.txt"
+                do
+                    if [ -f "$candidate" ]; then
+                        readme="$candidate"
+                        echo readme found
+                        break
+                    fi
+                done
+                if [ -n "$readme" ]; then
+                    if command -v bat >/dev/null 2>&1; then
+                        bat --style=plain --color=always --line-range=1:40 "$readme"
+                    else
+                        head -n 40 "$readme"
+                    fi
+                else
+                    echo "No README found in $dir"
+                fi
+            ' --preview-window=right:60%
+    )
 
     if [[ -n "$selected" ]]; then
         cd "$selected"
