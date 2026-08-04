@@ -1,8 +1,8 @@
 # Claude Code agentic-mode sandbox.
 # Base: Node (for @anthropic-ai/claude-code) on Debian slim for apt availability.
-FROM node:20-bookworm-slim
+FROM node:24-trixie-slim
 
-ARG GO_VERSION=1.23.4
+ARG GO_VERSION=1.26.5
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ripgrep fd-find jq less unzip \
         python3 python3-pip \
         openssh-client gnupg \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/fdfind /usr/local/bin/fd
 
 # GitHub CLI (user's workflow uses `gh`).
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
