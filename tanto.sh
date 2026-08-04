@@ -198,10 +198,18 @@ function claude-in-sandbox(){
     project_path="/home/claude/projects/$project_name"
     echo Project path: "$project_path"
   	security find-generic-password -s "Claude Code-credentials" -w > "$HOME/.claude/.credentials.json"
+    # gh keeps its token in the macOS keyring, not in hosts.yml, so hand it over explicitly.
+    local gh_token
+    gh_token="$(gh auth token 2>/dev/null || true)"
+    [ -n "$gh_token" ] || echo "Warning: no gh token on host; gh will be unauthenticated in the sandbox."
   	docker run --rm -it \
   		-v "$(pwd)":"$project_path" \
   		-v "$HOME/.claude":/home/claude/.claude \
   		-v "$HOME/.claude.json":/home/claude/.claude.json \
+  		-v "$HOME/.config/ccstatusline":/home/claude/.config/ccstatusline \
+  		-v "$HOME/.config/gh":/home/claude/.config/gh:ro \
+  		-v "$HOME/.gitconfig":/home/claude/.gitconfig:ro \
+  		-e GH_TOKEN="$gh_token" \
   		-e CURRENT_DIR_NAME="$project_name" \
   		-w "$project_path" \
   		claude-sandbox $@

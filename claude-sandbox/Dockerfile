@@ -51,8 +51,9 @@ RUN set -eux; \
 # Create the claude user.
 RUN useradd --create-home --shell /bin/bash claude
 
-# Claude Code CLI — NPM_CONFIG_PREFIX directs install to /home/claude/.npm-global.
-RUN npm install -g @anthropic-ai/claude-code \
+# Claude Code CLI and the status line renderer it invokes — NPM_CONFIG_PREFIX
+# directs install to /home/claude/.npm-global.
+RUN npm install -g @anthropic-ai/claude-code ccstatusline \
     && chown -R claude:claude /home/claude/.npm-global
 
 # Map host-style path so absolute paths in ~/.claude/settings.json hooks resolve.
