@@ -197,12 +197,34 @@ function claude-in-sandbox(){
     project_name="$(basename "$(pwd)")"
     project_path="/home/claude/projects/$project_name"
     echo Project path: "$project_path"
-  	security find-generic-password -s "Claude Code-credentials" -w > "$HOME/.claude/.credentials.json"
+    # The sandbox authenticates with its own long-lived token rather than a copy
+    # of the host login. Sharing one credential means both sides refresh it, and
+    # a rotated refresh token logs the loser out.
+    # Mint one with `claude setup-token`, then either export
+    # CLAUDE_CODE_OAUTH_TOKEN or stash it in the keychain:
+    #   security add-generic-password -s tanto-claude-oauth-token -a "$USER" -w <token>
+    local claude_token
+    claude_token="$CLAUDE_CODE_OAUTH_TOKEN"
+    [ -n "$claude_token" ] || claude_token="$(security find-generic-password -s tanto-claude-oauth-token -w 2>/dev/null || true)"
+    if [ -z "$claude_token" ]; then
+        echo "Warning: no sandbox token found; claude will prompt for /login in the container." >&2
+        echo "         Run 'claude setup-token', then export CLAUDE_CODE_OAUTH_TOKEN or add it to the keychain as tanto-claude-oauth-token." >&2
+    fi
     # gh keeps its token in the macOS keyring, not in hosts.yml, so hand it over explicitly.
     local gh_token
     gh_token="$(gh auth token 2>/dev/null || true)"
     [ -n "$gh_token" ] || echo "Warning: no gh token on host; gh will be unauthenticated in the sandbox."
+    # Hand the host daemon to the sandbox so e2e suites that need docker run
+    # instead of skipping. The socket appears inside the container as root:root
+    # 0660, so claude needs group 0 to talk to it. Note this gives the sandbox
+    # full control of the host daemon — set TANTO_NO_DOCKER_SOCK=1 to opt out.
+    local -a docker_sock_args
+    docker_sock_args=()
+    if [ -z "$TANTO_NO_DOCKER_SOCK" ] && [ -S /var/run/docker.sock ]; then
+        docker_sock_args=(-v /var/run/docker.sock:/var/run/docker.sock --group-add 0)
+    fi
   	docker run --rm -it \
+  		"${docker_sock_args[@]}" \
   		-v "$(pwd)":"$project_path" \
   		-v "$HOME/.claude":/home/claude/.claude \
   		-v "$HOME/.claude.json":/home/claude/.claude.json \
@@ -210,9 +232,33 @@ function claude-in-sandbox(){
   		-v "$HOME/.config/gh":/home/claude/.config/gh:ro \
   		-v "$HOME/.gitconfig":/home/claude/.gitconfig:ro \
   		-e GH_TOKEN="$gh_token" \
+  		-e CLAUDE_CODE_OAUTH_TOKEN="$claude_token" \
   		-e CURRENT_DIR_NAME="$project_name" \
   		-w "$project_path" \
   		claude-sandbox $@
+}
+
+function claude-usage {
+    set -euo pipefail
+
+    CREDENTIALS=$(
+      /usr/bin/security find-generic-password \
+        -s "Claude Code-credentials" \
+        -w
+    )
+
+    TOKEN=$(
+      jq -er '.claudeAiOauth.accessToken' <<<"$CREDENTIALS"
+    )
+
+    curl --fail --silent --show-error \
+      "https://api.anthropic.com/api/oauth/usage" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "anthropic-beta: oauth-2025-04-20" |
+      jq -r '
+        "five_hour: \(.five_hour.utilization)% (resets \(.five_hour.resets_at))",
+        "seven_day: \(.seven_day.utilization)% (resets \(.seven_day.resets_at))"
+      '
 }
 
 
