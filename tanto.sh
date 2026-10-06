@@ -183,7 +183,7 @@ function proj() {
 
     if [[ -n "$selected" ]]; then
         cd "$selected"
-        goland .
+        zed .
     fi
 }
 
@@ -259,6 +259,99 @@ function claude-usage {
         "five_hour: \(.five_hour.utilization)% (resets \(.five_hour.resets_at))",
         "seven_day: \(.seven_day.utilization)% (resets \(.seven_day.resets_at))"
       '
+}
+
+function codex-usage {
+    (
+      set -euo pipefail
+
+      local usage_dir request_fifo response_fifo server_pid line response
+      usage_dir="$(mktemp -d "${TMPDIR:-/tmp}/codex-usage.XXXXXX")"
+      request_fifo="$usage_dir/request"
+      response_fifo="$usage_dir/response"
+
+      cleanup() {
+          local exitcode=$?
+          exec 3>&- 2>/dev/null || true
+          exec 4<&- 2>/dev/null || true
+          if [ -n "${server_pid:-}" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+          fi
+          rm -f "$request_fifo" "$response_fifo" "$usage_dir/stderr"
+          rmdir "$usage_dir" 2>/dev/null || true
+          trap - EXIT
+          exit "$exitcode"
+      }
+      trap cleanup EXIT
+
+      mkfifo "$request_fifo" "$response_fifo"
+      codex app-server --listen stdio:// \
+        <"$request_fifo" \
+        >"$response_fifo" \
+        2>"$usage_dir/stderr" &
+      server_pid=$!
+
+      exec 3>"$request_fifo"
+      exec 4<"$response_fifo"
+
+      printf '%s\n' \
+        '{"id":1,"method":"initialize","params":{"clientInfo":{"name":"codex-usage","version":"1.0.0"}}}' \
+        >&3
+
+      response=""
+      while IFS= read -r line <&4; do
+          if jq -e '.id == 1' >/dev/null 2>&1 <<<"$line"; then
+              response="$line"
+              break
+          fi
+      done
+
+      if ! jq -e '.result != null' >/dev/null 2>&1 <<<"$response"; then
+          cat "$usage_dir/stderr" >&2
+          jq -r '.error.message // "Codex app-server failed to initialise"' \
+            <<<"${response:-null}" >&2
+          exit 1
+      fi
+
+      printf '%s\n' \
+        '{"method":"initialized"}' \
+        '{"id":2,"method":"account/rateLimits/read","params":{"excludeResetCreditDetails":true}}' \
+        >&3
+
+      response=""
+      while IFS= read -r line <&4; do
+          if jq -e '.id == 2' >/dev/null 2>&1 <<<"$line"; then
+              response="$line"
+              break
+          fi
+      done
+
+      if [ -z "$response" ]; then
+          cat "$usage_dir/stderr" >&2
+          echo "Codex app-server returned no usage response" >&2
+          exit 1
+      fi
+
+      jq -er '
+        if .error then error(.error.message) else .result end |
+        (.rateLimitsByLimitId.codex // .rateLimits) as $limits |
+        "five_hour: \($limits.primary.usedPercent)% (resets \($limits.primary.resetsAt | todateiso8601))",
+        "seven_day: \($limits.secondary.usedPercent)% (resets \($limits.secondary.resetsAt | todateiso8601))"
+      ' <<<"$response"
+    )
+}
+
+function agents-usage {
+    local exitcode=0
+
+    printf 'Claude\n------\n'
+    (claude-usage) || exitcode=$?
+
+    printf '\nCodex\n-----\n'
+    codex-usage || exitcode=$?
+
+    return "$exitcode"
 }
 
 
